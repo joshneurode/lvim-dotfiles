@@ -167,6 +167,53 @@ vim.cmd([[cnoreabbrev <expr> claude (getcmdtype() == ':' && getcmdline() ==# 'cl
 
 
 
+-- Over SSH, route the system clipboard through OSC 52 so yanks land in the
+-- clipboard of the *local* terminal (and therefore the local browser) instead
+-- of a remote X/Wayland selection nothing can see.
+--
+-- Neovim can do this itself, but only when the terminal advertised
+-- `g:termfeatures.osc52` and 'clipboard' is empty (see the tail of
+-- provider/clipboard.vim), and it loses that race to xsel/wl-copy/tmux when
+-- those are installed. Setting g:clipboard opts in unconditionally.
+--
+-- Paste is deliberately NOT OSC 52: reading the clipboard means querying the
+-- terminal and blocking up to 10s, and most terminals refuse the read for
+-- security reasons. Reading Neovim's own unnamed register keeps `"+p` instant.
+-- Local-machine paste still works normally via the terminal's own Ctrl-Shift-V.
+if vim.env.SSH_TTY or vim.env.SSH_CONNECTION then
+  local osc52 = require("vim.ui.clipboard.osc52")
+  local function paste_from_unnamed()
+    return vim.split(vim.fn.getreg('"') or "", "\n")
+  end
+
+  vim.g.clipboard = {
+    name = "OSC 52",
+    copy = { ["+"] = osc52.copy("+"), ["*"] = osc52.copy("*") },
+    paste = { ["+"] = paste_from_unnamed, ["*"] = paste_from_unnamed },
+  }
+
+  -- Setting g:clipboard is not enough on its own. autoload/provider/clipboard.vim
+  -- resolves the provider once and caches the answer in g:loaded_clipboard_provider
+  -- (0 = none, 2 = available), then refuses to re-run. LunarVim sets
+  -- clipboard=unnamedplus in config/settings.lua *before* sourcing this file, so
+  -- anything touching a register in between resolves the provider to "none" and
+  -- the assignment above is silently ignored -- symptom: "clipboard: No provider."
+  -- Force the re-resolve, per the instructions at the top of that runtime file.
+  vim.g.loaded_clipboard_provider = nil
+  vim.cmd("runtime autoload/provider/clipboard.vim")
+
+  -- LunarVim already sets clipboard=unnamedplus (config/settings.lua), so plain
+  -- `y` reaches the system clipboard on its own; these are just explicit aliases.
+  -- Note that unnamedplus also means d/c/x each emit an OSC 52 sequence. If that
+  -- gets noisy, add `vim.opt.clipboard = ""` here and use these mappings instead.
+  --
+  -- Registered through which_key rather than vim.keymap.set: LunarVim sets
+  -- mapleader *after* sourcing this file, so a literal "<leader>y" here would
+  -- bind to the default "\y" instead of "<Space>y".
+  lvim.builtin.which_key.mappings["y"] = { '"+y', "Yank to system clipboard" }
+  lvim.builtin.which_key.vmappings["y"] = { '"+y', "Yank to system clipboard" }
+end
+
 -- Auto-reload files that change on disk
 vim.opt.autoread = true
 
