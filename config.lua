@@ -13,6 +13,17 @@ lvim.keys.normal_mode["|"] = ":vsplit<CR>"
 lvim.keys.normal_mode["-"] = ":split<CR>"
 lvim.keys.term_mode["<C-`>"] = "<C-\\><C-n>"
 
+-- Option+arrows resize the current window (same directions as the <leader>R hydra).
+-- These override LunarVim's mac defaults, which shrink on Up.
+lvim.keys.normal_mode["<A-Up>"] = "<cmd>resize +2<CR>"
+lvim.keys.normal_mode["<A-Down>"] = "<cmd>resize -2<CR>"
+lvim.keys.normal_mode["<A-Left>"] = "<cmd>vertical resize -2<CR>"
+lvim.keys.normal_mode["<A-Right>"] = "<cmd>vertical resize +2<CR>"
+-- Ghostty's default keybinds send Option+Left/Right as ESC b / ESC f (shell word jumps),
+-- which Neovim receives as <A-b> / <A-f>.
+lvim.keys.normal_mode["<A-b>"] = "<cmd>vertical resize -2<CR>"
+lvim.keys.normal_mode["<A-f>"] = "<cmd>vertical resize +2<CR>"
+
 lvim.plugins = {
   "ChristianChiarulli/swenv.nvim",
   "stevearc/dressing.nvim",
